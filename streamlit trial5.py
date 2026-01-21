@@ -20,52 +20,86 @@ def load_settings():
     return {}
 
 # --- ΦΟΡΤΩΣΗ ΔΕΔΟΜΕΝΩΝ ---
-settings = load_settings()
-col_line_name = settings.get("col_line_name", None)
-col_weld_name = settings.get("col_weld_name", None)
-
 st.title("ℹ️ Weld Info / WPS Viewer")
 
-# Έλεγχος αν υπάρχει το Master Excel
+# Προσπάθεια φόρτωσης του Master Excel
+df = None
 if os.path.exists(PERMANENT_MASTER):
     try:
-        # Φόρτωση του Excel
         df = pd.read_excel(PERMANENT_MASTER)
-        df.columns = df.columns.astype(str).str.strip() # Καθαρισμός ονομάτων στηλών
-        
-        # Έλεγχος αν έχουν οριστεί οι στήλες από το άλλο πρόγραμμα
-        if col_line_name and col_weld_name and col_line_name in df.columns and col_weld_name in df.columns:
-            
-            st.info("Επίλεξε Γραμμή και Κόλληση για να δεις τις λεπτομέρειες.")
-            
-            c1, c2 = st.columns([1, 2])
-            
-            # Επιλογή Line
-            lines = sorted(df[col_line_name].astype(str).unique())
-            s_line = c1.selectbox("Line No", lines, index=None, placeholder="Επίλεξε Γραμμή...")
-            
-            # Επιλογή Weld (εξαρτάται από το Line)
-            s_weld = None
-            if s_line:
-                wlist = sorted(df[df[col_line_name] == s_line][col_weld_name].astype(str).unique())
-                s_weld = c1.selectbox("Weld No", wlist, index=None, placeholder="Επίλεξε Κόλληση...")
-                
-            st.divider()
-
-            # Εμφάνιση αποτελεσμάτων
-            if s_line and s_weld:
-                row = df[(df[col_line_name] == s_line) & (df[col_weld_name] == s_weld)]
-                if not row.empty:
-                    st.subheader(f"Λεπτομέρειες: {s_line} - {s_weld}")
-                    st.table(row.T) # Εμφάνιση κάθετα (Transpose)
-                else:
-                    st.warning("Δεν βρέθηκαν δεδομένα.")
-        else:
-            st.error("⚠️ Οι ρυθμίσεις στηλών δεν είναι σωστές ή λείπουν.")
-            st.warning("Παρακαλώ ανοίξτε το 'Weld Manager' και πηγαίνετε στα Settings για να ορίσετε τις στήλες (Mapping).")
-            
+        df.columns = df.columns.astype(str).str.strip()
     except Exception as e:
-        st.error(f"Σφάλμα κατά το άνοιγμα του αρχείου: {e}")
+        st.error(f"Error reading Excel: {e}")
 else:
-    st.error("⛔ Δεν βρέθηκε το αρχείο 'master.xlsx'.")
-    st.info("Παρακαλώ χρησιμοποιήστε το 'Weld Manager' για να ανεβάσετε το αρχείο master.")
+    st.warning("⚠️ Δεν βρέθηκε το αρχείο 'master.xlsx'. Τοποθέτησέ το στον ίδιο φάκελο.")
+
+# --- SIDEBAR: ΡΥΘΜΙΣΕΙΣ (ΑΝ ΧΡΕΙΑΖΟΝΤΑΙ) ---
+with st.sidebar:
+    st.header("⚙️ Ρυθμίσεις")
+    
+    # Φόρτωση υπαρχουσών ρυθμίσεων
+    settings = load_settings()
+    saved_line = settings.get("col_line_name")
+    saved_weld = settings.get("col_weld_name")
+
+    # Αν έχουμε Excel, ας δούμε αν ταιριάζουν οι στήλες
+    if df is not None:
+        all_cols = list(df.columns)
+        
+        # Έλεγχος αν οι αποθηκευμένες στήλες υπάρχουν όντως
+        idx_line = 0
+        idx_weld = 0
+        
+        if saved_line in all_cols:
+            idx_line = all_cols.index(saved_line)
+        if saved_weld in all_cols:
+            idx_weld = all_cols.index(saved_weld)
+
+        # Dropdowns για επιλογή στήλης
+        st.caption("Επίλεξε τις στήλες αναζήτησης:")
+        sel_line = st.selectbox("Στήλη LINE:", all_cols, index=idx_line)
+        sel_weld = st.selectbox("Στήλη WELD:", all_cols, index=idx_weld)
+        
+        # Ενημέρωση μεταβλητών για χρήση παρακάτω
+        col_line_name = sel_line
+        col_weld_name = sel_weld
+    else:
+        st.info("Φόρτωσε πρώτα ένα Excel (master.xlsx).")
+        col_line_name = None
+        col_weld_name = None
+
+# --- ΚΥΡΙΑ ΟΘΟΝΗ ---
+if df is not None and col_line_name and col_weld_name:
+    
+    st.markdown("---")
+    c1, c2 = st.columns([1, 2])
+    
+    # 1. Επιλογή Line
+    lines = sorted(df[col_line_name].astype(str).unique())
+    s_line = c1.selectbox("🔍 Αναζήτηση Line No:", lines, index=None, placeholder="Επίλεξε...")
+    
+    # 2. Επιλογή Weld (φιλτραρισμένη)
+    s_weld = None
+    if s_line:
+        # Βρες τις κολλήσεις που ανήκουν σε αυτή τη γραμμή
+        wlist = sorted(df[df[col_line_name] == s_line][col_weld_name].astype(str).unique())
+        s_weld = c1.selectbox("🔍 Αναζήτηση Weld No:", wlist, index=None, placeholder="Επίλεξε...")
+        
+    # 3. Εμφάνιση Πληροφοριών
+    if s_line and s_weld:
+        # Βρες τη γραμμή στο Excel
+        row = df[(df[col_line_name] == s_line) & (df[col_weld_name] == s_weld)]
+        
+        if not row.empty:
+            st.success(f"✅ Βρέθηκε: {s_line} / {s_weld}")
+            
+            # Μορφοποίηση εμφάνισης (Πίνακας)
+            st.subheader("📋 Λεπτομέρειες")
+            st.table(row.T) # Transpose για κάθετη λίστα
+        else:
+            st.warning("Δεν βρέθηκαν δεδομένα για αυτόν τον συνδυασμό.")
+    else:
+        st.info("👆 Επίλεξε Γραμμή και Κόλληση για να δεις τα δεδομένα.")
+
+elif df is None:
+    st.error("🛑 Λείπει το αρχείο δεδομένων.")
