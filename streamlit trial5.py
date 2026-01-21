@@ -6,7 +6,12 @@ import json
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="Weld Info Viewer", layout="wide", page_icon="ℹ️")
 
-# --- ΡΥΘΜΙΣΕΙΣ & ΑΡΧΕΙΑ ---
+# --- ΟΝΟΜΑΤΑ ΣΤΗΛΩΝ (DEFAULT) ---
+# Εδώ ορίζουμε τι θα ψάχνει αυτόματα
+DEFAULT_LINE_COL = "LINE No"
+DEFAULT_WELD_COL = "Weld No"
+
+# --- ΑΡΧΕΙΑ ---
 SETTINGS_FILE = "settings.json"
 PERMANENT_MASTER = "master.xlsx" 
 
@@ -27,36 +32,41 @@ df = None
 if os.path.exists(PERMANENT_MASTER):
     try:
         df = pd.read_excel(PERMANENT_MASTER)
+        # Καθαρισμός κενών στα ονόματα στηλών για να αποφύγουμε λάθη
         df.columns = df.columns.astype(str).str.strip()
     except Exception as e:
         st.error(f"Error reading Excel: {e}")
 else:
     st.warning("⚠️ Δεν βρέθηκε το αρχείο 'master.xlsx'. Τοποθέτησέ το στον ίδιο φάκελο.")
 
-# --- SIDEBAR: ΡΥΘΜΙΣΕΙΣ (ΑΝ ΧΡΕΙΑΖΟΝΤΑΙ) ---
+# --- SIDEBAR: ΡΥΘΜΙΣΕΙΣ ---
 with st.sidebar:
-    st.header("⚙️ Ρυθμίσεις")
+    st.header("⚙️ Ρυθμίσεις Στηλών")
     
-    # Φόρτωση υπαρχουσών ρυθμίσεων
+    # 1. Φόρτωση ρυθμίσεων (αν υπάρχουν) ή χρήση των DEFAULTS
     settings = load_settings()
-    saved_line = settings.get("col_line_name")
-    saved_weld = settings.get("col_weld_name")
+    
+    # Αν βρεις settings πάρε αυτά, αλλιώς πάρε τα Defaults που ζήτησες
+    saved_line = settings.get("col_line_name", DEFAULT_LINE_COL)
+    saved_weld = settings.get("col_weld_name", DEFAULT_WELD_COL)
 
-    # Αν έχουμε Excel, ας δούμε αν ταιριάζουν οι στήλες
+    # 2. Ρύθμιση Dropdowns
     if df is not None:
         all_cols = list(df.columns)
         
-        # Έλεγχος αν οι αποθηκευμένες στήλες υπάρχουν όντως
+        # Βρίσκουμε τη θέση (index) των στηλών στη λίστα
         idx_line = 0
         idx_weld = 0
         
+        # Αν υπάρχει η στήλη "LINE No" (ή αυτή που σώθηκε), βρες τη θέση της
         if saved_line in all_cols:
             idx_line = all_cols.index(saved_line)
+            
+        # Αν υπάρχει η στήλη "Weld No" (ή αυτή που σώθηκε), βρες τη θέση της
         if saved_weld in all_cols:
             idx_weld = all_cols.index(saved_weld)
 
-        # Dropdowns για επιλογή στήλης
-        st.caption("Επίλεξε τις στήλες αναζήτησης:")
+        # Δημιουργία των Selectbox με προεπιλογή
         sel_line = st.selectbox("Στήλη LINE:", all_cols, index=idx_line)
         sel_weld = st.selectbox("Στήλη WELD:", all_cols, index=idx_weld)
         
