@@ -8,11 +8,11 @@ from datetime import datetime
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="Cloud Weld Manager Pro", layout="wide", page_icon="🏗️")
 
-# --- 0. ΛΕΙΤΟΥΡΓΙΕΣ ΑΠΟΘΗΚΕΥΣΗΣ (PERSISTENCE) ---
+# --- 0. ΛΕΙΤΟΥΡΓΙΕΣ ΑΠΟΘΗΚΕΥΣΗΣ ---
 SETTINGS_FILE = "settings.json"
+PERMANENT_MASTER = "master.xlsx"  # <--- ΤΟ ΟΝΟΜΑ ΤΟΥ ΑΡΧΕΙΟΥ ΣΤΟ GITHUB
 
 def load_settings():
-    """Φορτώνει τις ρυθμίσεις από το αρχείο αν υπάρχει."""
     if os.path.exists(SETTINGS_FILE):
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -22,7 +22,6 @@ def load_settings():
     return {}
 
 def save_settings_to_file():
-    """Αποθηκεύει τις τρέχουσες μεταβλητές session σε αρχείο JSON."""
     settings = {
         "col_line_name": st.session_state.col_line_name,
         "col_weld_name": st.session_state.col_weld_name,
@@ -33,16 +32,15 @@ def save_settings_to_file():
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=4)
 
-# Φόρτωση ρυθμίσεων κατά την εκκίνηση
 saved_config = load_settings()
 
-# --- 1. SESSION STATE (Μνήμη) ---
+# --- 1. SESSION STATE ---
 if 'master_df' not in st.session_state:
     st.session_state.master_df = None
 if 'production_log' not in st.session_state:
     st.session_state.production_log = pd.DataFrame() 
 
-# --- INITIALIZE VARIABLES WITH SAVED VALUES ---
+# --- INITIALIZE VARIABLES ---
 if 'col_line_name' not in st.session_state:
     st.session_state.col_line_name = saved_config.get("col_line_name", None)
 if 'col_weld_name' not in st.session_state:
@@ -60,32 +58,49 @@ with st.sidebar:
     st.title("🎛️ Μενού")
     app_mode = st.radio("Επίλεξε Λειτουργία:", ["⚙️ Settings & Setup", "🔨 Daily Production", "ℹ️ Weld Info / WPS"])
     st.divider()
-    st.caption("v5.0 - Type 1/2 & Date Fix")
+    st.caption("v6.0 - Cloud Ready")
     
     if st.button("💾 Force Save Settings"):
         save_settings_to_file()
-        st.toast("Settings saved to disk!", icon="💾")
+        st.toast("Settings saved!", icon="💾")
 
 # --- 3. ΛΕΙΤΟΥΡΓΙΑ 1: SETTINGS ---
 if app_mode == "⚙️ Settings & Setup":
     st.header("⚙️ Ρυθμίσεις Εφαρμογής")
     
-    # --- A. HEADER & UPLOAD ---
+    # --- A. HEADER & UPLOAD (ΑΥΤΟΜΑΤΗ ΦΟΡΤΩΣΗ) ---
     with st.expander("1. Φόρτωση Master Excel", expanded=True):
         col_row, col_upload = st.columns([1, 2])
         with col_row:
             header_row_val = st.number_input("Γραμμή Τίτλων:", min_value=1, value=1)
-        with col_upload:
-            uploaded_master = st.file_uploader("Upload Excel", type=["xlsx"])
         
+        # ΛΟΓΙΚΗ: Ψάχνουμε πρώτα αν ανέβασε κάτι ο χρήστης, αλλιώς ψάχνουμε το μόνιμο
+        with col_upload:
+            uploaded_master = st.file_uploader("Upload νέου Excel (αλλιώς φορτώνεται το μόνιμο)", type=["xlsx"])
+        
+        # Αν υπάρχει uploaded file, πάρε αυτό. Αν όχι, δες αν υπάρχει το μόνιμο στο GitHub/Folder
+        file_to_load = None
         if uploaded_master:
+            file_to_load = uploaded_master
+        elif os.path.exists(PERMANENT_MASTER):
+            file_to_load = PERMANENT_MASTER
+            st.info(f"📂 Χρήση μόνιμου αρχείου: {PERMANENT_MASTER}")
+
+        # Φόρτωση DataFrame
+        if file_to_load:
             try:
-                df = pd.read_excel(uploaded_master, header=header_row_val - 1)
-                df.columns = df.columns.astype(str).str.strip()
-                st.session_state.master_df = df
-                st.success(f"✅ Master Loaded! ({len(df)} lines)")
+                # Αν είναι ήδη loaded στη μνήμη και δεν άλλαξε το αρχείο, μην το ξαναφορτώνεις (Optimization)
+                if st.session_state.master_df is None:
+                    df = pd.read_excel(file_to_load, header=header_row_val - 1)
+                    df.columns = df.columns.astype(str).str.strip()
+                    st.session_state.master_df = df
+                    st.success(f"✅ Master Loaded! ({len(df)} lines)")
+                else:
+                    st.success(f"✅ Master Ready ({len(st.session_state.master_df)} lines)")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error loading Excel: {e}")
+        else:
+             st.warning("⚠️ Δεν βρέθηκε αρχείο master.xlsx και δεν ανεβάσατε κάτι.")
 
     # --- B. MAPPING ---
     if st.session_state.master_df is not None:
@@ -109,7 +124,7 @@ if app_mode == "⚙️ Settings & Setup":
                 save_settings_to_file()
                 st.toast("Mapping Saved!", icon="✅")
 
-        # --- C. ADVANCED SETTINGS ---
+        # --- C. ADVANCED ---
         st.divider()
         st.subheader("🛠️ Διαμόρφωση Log Παραγωγής")
         
@@ -134,7 +149,7 @@ if app_mode == "⚙️ Settings & Setup":
                 st.toast("Reference saved!")
 
         with tab3:
-            st.info("Επιπλέον στήλες (πέρα από Type 1/2 που είναι στάνταρ).")
+            st.info("Επιπλέον στήλες (Type 1 & 2 υπάρχουν ήδη).")
             current_custom = ", ".join(st.session_state.custom_free_columns)
             custom_input = st.text_area("Ονόματα στηλών με κόμμα:", value=current_custom)
             if st.button("💾 Save Custom Fields"):
@@ -143,106 +158,108 @@ if app_mode == "⚙️ Settings & Setup":
                 save_settings_to_file()
                 st.toast(f"Saved custom fields!")
 
-    elif not uploaded_master and st.session_state.master_df is None:
-         st.warning("⚠️ Waiting for Master Excel...")
-
-
 # --- 4. ΛΕΙΤΟΥΡΓΙΑ 2: DAILY PRODUCTION ---
 elif app_mode == "🔨 Daily Production":
     st.header("🔨 Καταγραφή Παραγωγής")
     
     if st.session_state.master_df is None or st.session_state.col_line_name is None:
-        st.error("⛔ Πήγαινε στα Settings για αρχικοποίηση!")
-    else:
+        # Δοκιμή αυτόματης φόρτωσης αν δεν έχει γίνει load
+        if os.path.exists(PERMANENT_MASTER) and st.session_state.master_df is None:
+             try:
+                st.session_state.master_df = pd.read_excel(PERMANENT_MASTER, header=0)
+                st.rerun()
+             except:
+                st.error("⛔ Πήγαινε στα Settings, κάτι δεν πάει καλά με το αρχείο.")
+        elif st.session_state.master_df is None:
+            st.error("⛔ Πήγαινε στα Settings για αρχικοποίηση!")
+            
+    if st.session_state.master_df is not None:
         master = st.session_state.master_df
         LINE_COL = st.session_state.col_line_name
         WELD_COL = st.session_state.col_weld_name
 
         # --- 1. SELECTION ---
         c_sel1, c_sel2 = st.columns(2)
-        lines = sorted(master[LINE_COL].astype(str).unique())
-        sel_line = c_sel1.selectbox("Line No", lines, index=None, placeholder="Search Line...")
-        
-        avail_welds = []
-        if sel_line:
-            avail_welds = sorted(master[master[LINE_COL] == sel_line][WELD_COL].astype(str).unique())
-        sel_weld = c_sel2.selectbox("Weld No", avail_welds, index=None, placeholder="Select Weld...")
+        # Check αν οι στήλες υπάρχουν (σε περίπτωση που άλλαξε το Excel)
+        if LINE_COL in master.columns and WELD_COL in master.columns:
+            lines = sorted(master[LINE_COL].astype(str).unique())
+            sel_line = c_sel1.selectbox("Line No", lines, index=None, placeholder="Search Line...")
+            
+            avail_welds = []
+            if sel_line:
+                avail_welds = sorted(master[master[LINE_COL] == sel_line][WELD_COL].astype(str).unique())
+            sel_weld = c_sel2.selectbox("Weld No", avail_welds, index=None, placeholder="Select Weld...")
 
-        # --- 2. LIVE INFO PANEL ---
-        if sel_line and sel_weld and st.session_state.production_ref_columns:
-            row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
-            if not row.empty:
-                st.info("ℹ️ Στοιχεία Κόλλησης (Από Master)")
-                ref_data = row[st.session_state.production_ref_columns].iloc[0].to_dict()
-                cols = st.columns(len(ref_data))
-                for idx, (k, v) in enumerate(ref_data.items()):
-                    cols[idx % len(cols)].metric(label=k, value=str(v))
-        
+            # --- 2. LIVE INFO PANEL ---
+            if sel_line and sel_weld and st.session_state.production_ref_columns:
+                row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
+                if not row.empty:
+                    st.info("ℹ️ Στοιχεία Κόλλησης (Από Master)")
+                    ref_data = row[st.session_state.production_ref_columns].iloc[0].to_dict()
+                    cols = st.columns(len(ref_data))
+                    for idx, (k, v) in enumerate(ref_data.items()):
+                        cols[idx % len(cols)].metric(label=k, value=str(v))
+            
+            st.divider()
+
+            # --- 3. INPUT FORM ---
+            with st.form("entry_form"):
+                st.subheader("Στοιχεία Καταχώρησης")
+                
+                row1_c1, row1_c2, row1_c3 = st.columns(3)
+                date_val = row1_c1.date_input("Date")
+                res = row1_c2.selectbox("Result", ["Accepted", "Rejected", "Pending"])
+                welder = row1_c3.text_input("Welder Stamp", value="User")
+                
+                row2_c1, row2_c2 = st.columns(2)
+                type1_val = row2_c1.text_input("Type 1")
+                type2_val = row2_c2.text_input("Type 2")
+
+                custom_values = {}
+                if st.session_state.custom_free_columns:
+                    st.write("📝 Extra Fields")
+                    c_cols = st.columns(len(st.session_state.custom_free_columns))
+                    for idx, col_name in enumerate(st.session_state.custom_free_columns):
+                        custom_values[col_name] = c_cols[idx % 3].text_input(col_name)
+
+                submitted = st.form_submit_button("➕ Προσθήκη", type="primary")
+                
+                if submitted:
+                    if sel_line and sel_weld:
+                        formatted_date = date_val.strftime("%d/%m/%Y")
+
+                        new_entry = {
+                            "Date": formatted_date,
+                            "LineNo": sel_line,
+                            "WeldNo": sel_weld,
+                            "Type 1": type1_val,
+                            "Type 2": type2_val,
+                            "Welder": welder,
+                            "Result": res
+                        }
+                        
+                        if st.session_state.auto_fill_columns:
+                            row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
+                            if not row.empty:
+                                for auto_col in st.session_state.auto_fill_columns:
+                                    new_entry[auto_col] = row[auto_col].values[0]
+                        
+                        new_entry.update(custom_values)
+                        
+                        st.session_state.production_log = pd.concat(
+                            [st.session_state.production_log, pd.DataFrame([new_entry])], 
+                            ignore_index=True
+                        )
+                        st.success("Καταχωρήθηκε!")
+                        st.rerun()
+                    else:
+                        st.error("Πρέπει να επιλέξεις Line και Weld!")
+        else:
+            st.error(f"Οι στήλες {LINE_COL} ή {WELD_COL} δεν βρέθηκαν στο νέο Excel. Πήγαινε στα Settings για Mapping.")
+
+        # --- 4. LOG ---
         st.divider()
-
-        # --- 3. INPUT FORM ---
-        with st.form("entry_form"):
-            st.subheader("Στοιχεία Καταχώρησης")
-            
-            # Σειρά 1: Ημερομηνία, Αποτέλεσμα, Συγκολλητής
-            row1_c1, row1_c2, row1_c3 = st.columns(3)
-            date_val = row1_c1.date_input("Date")
-            res = row1_c2.selectbox("Result", ["Accepted", "Rejected", "Pending"])
-            welder = row1_c3.text_input("Welder Stamp", value="User")
-            
-            # Σειρά 2: Type 1, Type 2
-            row2_c1, row2_c2 = st.columns(2)
-            type1_val = row2_c1.text_input("Type 1")
-            type2_val = row2_c2.text_input("Type 2")
-
-            # Custom Fields (Αν υπάρχουν)
-            custom_values = {}
-            if st.session_state.custom_free_columns:
-                st.write("📝 Extra Fields")
-                c_cols = st.columns(len(st.session_state.custom_free_columns))
-                for idx, col_name in enumerate(st.session_state.custom_free_columns):
-                    custom_values[col_name] = c_cols[idx % 3].text_input(col_name)
-
-            submitted = st.form_submit_button("➕ Προσθήκη Εγγραφής", type="primary")
-            
-            if submitted:
-                if sel_line and sel_weld:
-                    # Μετατροπή ημερομηνίας σε string για σιγουριά
-                    formatted_date = date_val.strftime("%d/%m/%Y")
-
-                    new_entry = {
-                        "Date": formatted_date,  # <--- Τώρα σώζεται σωστά
-                        "LineNo": sel_line,
-                        "WeldNo": sel_weld,
-                        "Type 1": type1_val,     # <--- ΝΕΟ ΠΕΔΙΟ
-                        "Type 2": type2_val,     # <--- ΝΕΟ ΠΕΔΙΟ
-                        "Welder": welder,
-                        "Result": res
-                    }
-                    
-                    # Auto-Fill από Master
-                    if st.session_state.auto_fill_columns:
-                        row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
-                        if not row.empty:
-                            for auto_col in st.session_state.auto_fill_columns:
-                                new_entry[auto_col] = row[auto_col].values[0]
-                    
-                    # Custom Fields
-                    new_entry.update(custom_values)
-                    
-                    # Προσθήκη στο Log
-                    st.session_state.production_log = pd.concat(
-                        [st.session_state.production_log, pd.DataFrame([new_entry])], 
-                        ignore_index=True
-                    )
-                    st.success("Καταχωρήθηκε!")
-                    st.rerun()
-                else:
-                    st.error("Πρέπει να επιλέξεις Line και Weld!")
-
-        # --- 4. LOG (EDITABLE) ---
-        st.divider()
-        st.subheader("📋 Log Ημέρας (Επεξεργάσιμο)")
+        st.subheader("📋 Log Ημέρας")
         
         if not st.session_state.production_log.empty:
             edited_log = st.data_editor(
@@ -256,40 +273,44 @@ elif app_mode == "🔨 Daily Production":
                 st.session_state.production_log = edited_log
                 st.rerun()
             
-            st.caption("💡 Delete: Επίλεξε γραμμή + Delete πλήκτρο. Edit: Διπλό κλικ στο κελί.")
+            st.caption("Διπλό κλικ για επεξεργασία, επιλογή και Delete για διαγραφή.")
 
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer) as writer:
                 st.session_state.production_log.to_excel(writer, index=False)
             st.download_button("📥 Download Excel", buffer.getvalue(), "daily_production.xlsx")
         else:
-            st.info("Δεν υπάρχουν εγγραφές ακόμα.")
-
+            st.info("Καμία εγγραφή ακόμα.")
 
 # --- 5. INFO TAB ---
 elif app_mode == "ℹ️ Weld Info / WPS":
     st.header("ℹ️ Αναζήτηση Πληροφοριών")
     
-    if st.session_state.master_df is None:
-        st.error("Settings first!")
-    else:
+    if st.session_state.master_df is None and os.path.exists(PERMANENT_MASTER):
+        st.session_state.master_df = pd.read_excel(PERMANENT_MASTER, header=0)
+
+    if st.session_state.master_df is not None:
         master = st.session_state.master_df
-        LINE_COL = st.session_state.col_line_name
-        WELD_COL = st.session_state.col_weld_name
-        
-        c1, c2 = st.columns([1, 2])
-        lines = sorted(master[LINE_COL].astype(str).unique())
-        s_line = c1.selectbox("Line", lines, index=None)
-        
-        s_weld = None
-        if s_line:
-            wlist = sorted(master[master[LINE_COL] == s_line][WELD_COL].astype(str).unique())
-            s_weld = c1.selectbox("Weld", wlist, index=None)
+        if st.session_state.col_line_name and st.session_state.col_weld_name:
+            LINE_COL = st.session_state.col_line_name
+            WELD_COL = st.session_state.col_weld_name
             
-        if s_line and s_weld:
-            row = master[(master[LINE_COL] == s_line) & (master[WELD_COL] == s_weld)]
-            if not row.empty:
+            c1, c2 = st.columns([1, 2])
+            lines = sorted(master[LINE_COL].astype(str).unique())
+            s_line = c1.selectbox("Line", lines, index=None)
+            
+            s_weld = None
+            if s_line:
+                wlist = sorted(master[master[LINE_COL] == s_line][WELD_COL].astype(str).unique())
+                s_weld = c1.selectbox("Weld", wlist, index=None)
+                
+            if s_line and s_weld:
+                row = master[(master[LINE_COL] == s_line) & (master[WELD_COL] == s_weld)]
                 st.table(row.T)
+        else:
+            st.warning("Παρακαλώ κάντε Mapping στα Settings πρώτα.")
+    else:
+        st.error("Δεν βρέθηκε Master Excel.")
 
 # --- AUTO-RUN ---
 if __name__ == '__main__':
