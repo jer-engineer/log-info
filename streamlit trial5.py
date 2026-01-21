@@ -45,8 +45,17 @@ if 'col_line_name' not in st.session_state:
     st.session_state.col_line_name = saved_config.get("col_line_name", None)
 if 'col_weld_name' not in st.session_state:
     st.session_state.col_weld_name = saved_config.get("col_weld_name", None)
+
+# --- ΕΔΩ ΕΓΙΝΕ Η ΑΛΛΑΓΗ ΓΙΑ ΤΑ DEFAULT TOY TAB 1 ---
 if 'auto_fill_columns' not in st.session_state:
-    st.session_state.auto_fill_columns = saved_config.get("auto_fill_columns", [])
+    # Αν υπάρχει αποθηκευμένο, παίρνει αυτό. Αλλιώς βάζει τα default που ζήτησες.
+    saved_auto = saved_config.get("auto_fill_columns", [])
+    if saved_auto:
+        st.session_state.auto_fill_columns = saved_auto
+    else:
+        # Default προτάσεις αν είναι η πρώτη φορά
+        st.session_state.auto_fill_columns = ["Consumable", "HEAT NO TYPE 1", "HEAT NO TYPE 2"]
+
 if 'production_ref_columns' not in st.session_state:
     st.session_state.production_ref_columns = saved_config.get("production_ref_columns", [])
 if 'custom_free_columns' not in st.session_state:
@@ -58,7 +67,7 @@ with st.sidebar:
     st.title("🎛️ Μενού")
     app_mode = st.radio("Επίλεξε Λειτουργία:", ["⚙️ Settings & Setup", "🔨 Daily Production", "ℹ️ Weld Info / WPS"])
     st.divider()
-    st.caption("v6.1 - Fixes Applied")
+    st.caption("v6.2 - Renamed Fields")
     
     if st.button("💾 Force Save Settings"):
         save_settings_to_file()
@@ -74,11 +83,9 @@ if app_mode == "⚙️ Settings & Setup":
         with col_row:
             header_row_val = st.number_input("Γραμμή Τίτλων:", min_value=1, value=1)
         
-        # ΛΟΓΙΚΗ: Ψάχνουμε πρώτα αν ανέβασε κάτι ο χρήστης, αλλιώς ψάχνουμε το μόνιμο
         with col_upload:
             uploaded_master = st.file_uploader("Upload νέου Excel (αλλιώς φορτώνεται το μόνιμο)", type=["xlsx"])
         
-        # Αν υπάρχει uploaded file, πάρε αυτό. Αν όχι, δες αν υπάρχει το μόνιμο στο GitHub/Folder
         file_to_load = None
         if uploaded_master:
             file_to_load = uploaded_master
@@ -86,13 +93,10 @@ if app_mode == "⚙️ Settings & Setup":
             file_to_load = PERMANENT_MASTER
             st.info(f"📂 Χρήση μόνιμου αρχείου: {PERMANENT_MASTER}")
 
-        # Φόρτωση DataFrame
         if file_to_load:
             try:
-                # Αν είναι ήδη loaded στη μνήμη και δεν άλλαξε το αρχείο, μην το ξαναφορτώνεις (Optimization)
                 if st.session_state.master_df is None:
                     df = pd.read_excel(file_to_load, header=header_row_val - 1)
-                    # Καθαρισμός ονομάτων στηλών
                     df.columns = df.columns.astype(str).str.strip()
                     st.session_state.master_df = df
                     st.success(f"✅ Master Loaded! ({len(df)} lines)")
@@ -133,8 +137,8 @@ if app_mode == "⚙️ Settings & Setup":
         
         with tab1:
             st.info("Ποιες στήλες του Master να αντιγράφονται στο Log;")
+            # Εδώ εμφανίζονται τα defaults που ζήτησες (Consumable κτλ) αν υπάρχουν στο Excel
             valid_defaults = [c for c in st.session_state.auto_fill_columns if c in all_cols]
-            # FIX: Added unique key
             sel_auto = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults, key="multi_autofill")
             if st.button("💾 Save Auto-Fill"):
                 st.session_state.auto_fill_columns = sel_auto
@@ -144,7 +148,6 @@ if app_mode == "⚙️ Settings & Setup":
         with tab2:
             st.info("Ποιες στήλες να φαίνονται μόνο ως πληροφορία;")
             valid_defaults_ref = [c for c in st.session_state.production_ref_columns if c in all_cols]
-            # FIX: Added unique key
             sel_ref = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults_ref, key="multi_ref")
             if st.button("💾 Save Reference"):
                 st.session_state.production_ref_columns = sel_ref
@@ -152,7 +155,7 @@ if app_mode == "⚙️ Settings & Setup":
                 st.toast("Reference saved!")
 
         with tab3:
-            st.info("Επιπλέον στήλες (Type 1 & 2 υπάρχουν ήδη).")
+            st.info("Επιπλέον στήλες (Πέρα από τα HEAT NO, WELDER κτλ).")
             current_custom = ", ".join(st.session_state.custom_free_columns)
             custom_input = st.text_area("Ονόματα στηλών με κόμμα:", value=current_custom)
             if st.button("💾 Save Custom Fields"):
@@ -166,7 +169,6 @@ elif app_mode == "🔨 Daily Production":
     st.header("🔨 Καταγραφή Παραγωγής")
     
     if st.session_state.master_df is None or st.session_state.col_line_name is None:
-        # Δοκιμή αυτόματης φόρτωσης αν δεν έχει γίνει load
         if os.path.exists(PERMANENT_MASTER) and st.session_state.master_df is None:
              try:
                 st.session_state.master_df = pd.read_excel(PERMANENT_MASTER, header=0)
@@ -183,7 +185,6 @@ elif app_mode == "🔨 Daily Production":
 
         # --- 1. SELECTION ---
         c_sel1, c_sel2 = st.columns(2)
-        # Check αν οι στήλες υπάρχουν (σε περίπτωση που άλλαξε το Excel)
         if LINE_COL in master.columns and WELD_COL in master.columns:
             lines = sorted(master[LINE_COL].astype(str).unique())
             sel_line = c_sel1.selectbox("Line No", lines, index=None, placeholder="Search Line...")
@@ -215,11 +216,13 @@ elif app_mode == "🔨 Daily Production":
                 row1_c1, row1_c2, row1_c3 = st.columns(3)
                 date_val = row1_c1.date_input("Date")
                 res = row1_c2.selectbox("Result", ["Accepted", "Rejected", "Pending"])
-                welder = row1_c3.text_input("Welder Stamp", value="User")
+                # ΑΛΛΑΓΗ ΟΝΟΜΑΤΟΣ: WELDER
+                welder = row1_c3.text_input("WELDER", value="User")
                 
                 row2_c1, row2_c2 = st.columns(2)
-                type1_val = row2_c1.text_input("Type 1")
-                type2_val = row2_c2.text_input("Type 2")
+                # ΑΛΛΑΓΗ ΟΝΟΜΑΤΩΝ: HEAT NO TYPE 1 & 2
+                type1_val = row2_c1.text_input("HEAT NO TYPE 1")
+                type2_val = row2_c2.text_input("HEAT NO TYPE 2")
 
                 custom_values = {}
                 if st.session_state.custom_free_columns:
@@ -236,11 +239,11 @@ elif app_mode == "🔨 Daily Production":
 
                         new_entry = {
                             "Date": formatted_date,
-                            "LineNo": sel_line,
-                            "WeldNo": sel_weld,
-                            "Type 1": type1_val,
-                            "Type 2": type2_val,
-                            "Welder": welder,
+                            "Line No": sel_line,       # ΑΛΛΑΓΗ (ΚΕΝΟ)
+                            "Weld No": sel_weld,       # ΑΛΛΑΓΗ (ΚΕΝΟ)
+                            "HEAT NO TYPE 1": type1_val, # ΑΛΛΑΓΗ
+                            "HEAT NO TYPE 2": type2_val, # ΑΛΛΑΓΗ
+                            "WELDER": welder,          # ΑΛΛΑΓΗ (CAPS)
                             "Result": res
                         }
                         
@@ -248,7 +251,6 @@ elif app_mode == "🔨 Daily Production":
                             row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
                             if not row.empty:
                                 for auto_col in st.session_state.auto_fill_columns:
-                                    # Safe get value
                                     val = row[auto_col].values[0]
                                     new_entry[auto_col] = val
                         
@@ -270,11 +272,10 @@ elif app_mode == "🔨 Daily Production":
         st.subheader("📋 Log Ημέρας")
         
         if not st.session_state.production_log.empty:
-            # FIX: Updated width parameter to satisfy warning
             edited_log = st.data_editor(
                 st.session_state.production_log,
                 num_rows="dynamic",
-                use_container_width=True, # Αφήνω αυτό για συμβατότητα, αν θες το νέο βάλε width="stretch"
+                use_container_width=True,
                 key="editor_log"
             )
             
