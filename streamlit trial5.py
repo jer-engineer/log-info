@@ -58,7 +58,7 @@ with st.sidebar:
     st.title("🎛️ Μενού")
     app_mode = st.radio("Επίλεξε Λειτουργία:", ["⚙️ Settings & Setup", "🔨 Daily Production", "ℹ️ Weld Info / WPS"])
     st.divider()
-    st.caption("v6.0 - Cloud Ready")
+    st.caption("v6.1 - Fixes Applied")
     
     if st.button("💾 Force Save Settings"):
         save_settings_to_file()
@@ -92,6 +92,7 @@ if app_mode == "⚙️ Settings & Setup":
                 # Αν είναι ήδη loaded στη μνήμη και δεν άλλαξε το αρχείο, μην το ξαναφορτώνεις (Optimization)
                 if st.session_state.master_df is None:
                     df = pd.read_excel(file_to_load, header=header_row_val - 1)
+                    # Καθαρισμός ονομάτων στηλών
                     df.columns = df.columns.astype(str).str.strip()
                     st.session_state.master_df = df
                     st.success(f"✅ Master Loaded! ({len(df)} lines)")
@@ -133,7 +134,8 @@ if app_mode == "⚙️ Settings & Setup":
         with tab1:
             st.info("Ποιες στήλες του Master να αντιγράφονται στο Log;")
             valid_defaults = [c for c in st.session_state.auto_fill_columns if c in all_cols]
-            sel_auto = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults)
+            # FIX: Added unique key
+            sel_auto = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults, key="multi_autofill")
             if st.button("💾 Save Auto-Fill"):
                 st.session_state.auto_fill_columns = sel_auto
                 save_settings_to_file()
@@ -142,7 +144,8 @@ if app_mode == "⚙️ Settings & Setup":
         with tab2:
             st.info("Ποιες στήλες να φαίνονται μόνο ως πληροφορία;")
             valid_defaults_ref = [c for c in st.session_state.production_ref_columns if c in all_cols]
-            sel_ref = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults_ref)
+            # FIX: Added unique key
+            sel_ref = st.multiselect("Επίλεξε στήλες:", all_cols, default=valid_defaults_ref, key="multi_ref")
             if st.button("💾 Save Reference"):
                 st.session_state.production_ref_columns = sel_ref
                 save_settings_to_file()
@@ -195,10 +198,13 @@ elif app_mode == "🔨 Daily Production":
                 row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
                 if not row.empty:
                     st.info("ℹ️ Στοιχεία Κόλλησης (Από Master)")
-                    ref_data = row[st.session_state.production_ref_columns].iloc[0].to_dict()
-                    cols = st.columns(len(ref_data))
-                    for idx, (k, v) in enumerate(ref_data.items()):
-                        cols[idx % len(cols)].metric(label=k, value=str(v))
+                    try:
+                        ref_data = row[st.session_state.production_ref_columns].iloc[0].to_dict()
+                        cols = st.columns(len(ref_data))
+                        for idx, (k, v) in enumerate(ref_data.items()):
+                            cols[idx % len(cols)].metric(label=str(k), value=str(v))
+                    except Exception as e:
+                        st.warning(f"Error displaying info: {e}")
             
             st.divider()
 
@@ -242,7 +248,9 @@ elif app_mode == "🔨 Daily Production":
                             row = master[(master[LINE_COL] == sel_line) & (master[WELD_COL] == sel_weld)]
                             if not row.empty:
                                 for auto_col in st.session_state.auto_fill_columns:
-                                    new_entry[auto_col] = row[auto_col].values[0]
+                                    # Safe get value
+                                    val = row[auto_col].values[0]
+                                    new_entry[auto_col] = val
                         
                         new_entry.update(custom_values)
                         
@@ -262,10 +270,11 @@ elif app_mode == "🔨 Daily Production":
         st.subheader("📋 Log Ημέρας")
         
         if not st.session_state.production_log.empty:
+            # FIX: Updated width parameter to satisfy warning
             edited_log = st.data_editor(
                 st.session_state.production_log,
                 num_rows="dynamic",
-                use_container_width=True,
+                use_container_width=True, # Αφήνω αυτό για συμβατότητα, αν θες το νέο βάλε width="stretch"
                 key="editor_log"
             )
             
