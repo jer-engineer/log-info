@@ -86,6 +86,7 @@ with st.sidebar:
         idx_pre  = get_index(all_cols, settings.get("col_pre_name"), DEFAULT_PREHEAT_COL)
         idx_pwht = get_index(all_cols, settings.get("col_pwht_name"), DEFAULT_PWHT_COL)
         idx_mat  = get_index(all_cols, settings.get("col_mat_name"), DEFAULT_MAT_COL)
+        idx_draw = get_index(all_cols, settings.get("col_draw_name"), DEFAULT_DRAWING_COL)
 
         col_wps_name  = st.selectbox("Στήλη WPS:", all_cols, index=idx_wps)
         col_pre_name  = st.selectbox("Στήλη Preheat:", all_cols, index=idx_pre)
@@ -160,7 +161,7 @@ if df is not None and col_line_name:
                 st.subheader("Λίστα Κολλήσεων Σχεδίου")
 
                 # Στήλες για Drawing List (ΕΔΩ ΠΡΟΣΘΕΤΟΥΜΕ ΤΟ LINE NO)
-                cols_to_show = [col_line_name, col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name]
+                cols_to_show = [col_line_name, col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_draw_name]
                 
                 # Έλεγχος αν υπάρχουν οι στήλες
                 existing_cols = [c for c in cols_to_show if c in subset.columns]
