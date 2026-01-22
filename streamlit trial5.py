@@ -18,7 +18,6 @@ DEFAULT_WPS_COL = "WPS"
 DEFAULT_PREHEAT_COL = "Preheat"
 DEFAULT_PWHT_COL = "PWHT"
 DEFAULT_MAT_COL = "Material 1" # Ή σκέτο "Material" ανάλογα το Excel
-DEFAULT_DRAW_COL = "Drawing No"  # <--- ΝΕΟ: Default όνομα στήλης
 
 # --- ΦΟΡΤΩΣΗ ΡΥΘΜΙΣΕΩΝ ---
 def load_settings():
@@ -120,7 +119,7 @@ if df is not None and col_line_name:
                     ap_value = val
 
             # Εμφάνιση Header
-            st.info(f"📌 **Line:** {sel_line_overview}  |  📄 **AP Doc Code:** {ap_value}  |  📐 **Drawing:** {draw_value}")
+            st.info(f"📌 **Line:** {sel_line_overview}  |  📄 **AP Doc Code:** {ap_value}")
 
             # 3. Λίστα Κολλήσεων με τα επιπλέον πεδία
             st.subheader("Λίστα Κολλήσεων")
