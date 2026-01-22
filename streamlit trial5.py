@@ -12,7 +12,7 @@ PERMANENT_MASTER = "master.xlsx"
 
 # Default ονόματα στηλών
 DEFAULT_LINE_COL = "LINE No"
-DEFAULT_DRAWING_COL = "Drawing No"  # <--- ΝΕΟ DEFAULT
+DEFAULT_DRAWING_COL = "DRAWING No"  # <--- ΝΕΟ DEFAULT
 DEFAULT_WELD_COL = "Weld No"
 DEFAULT_AP_COL = "AP Doc Code"
 DEFAULT_WPS_COL = "WPS"
