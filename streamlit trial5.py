@@ -127,7 +127,7 @@ if df is not None and col_line_name:
             st.subheader("Λίστα Κολλήσεων")
             
             # Στήλες για Line List (Δεν βάζουμε το Line No εδώ, αφού είναι στον τίτλο)
-            cols_to_show = [col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name]
+            cols_to_show = [col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name ,col_draw_name]
             existing_cols = [c for c in cols_to_show if c in subset.columns]
             
             display_df = subset[existing_cols].copy()
@@ -161,7 +161,7 @@ if df is not None and col_line_name:
                 st.subheader("Λίστα Κολλήσεων Σχεδίου")
 
                 # Στήλες για Drawing List (ΕΔΩ ΠΡΟΣΘΕΤΟΥΜΕ ΤΟ LINE NO)
-                cols_to_show = [col_line_name, col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_draw_name]
+                cols_to_show = [col_line_name, col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name]
                 
                 # Έλεγχος αν υπάρχουν οι στήλες
                 existing_cols = [c for c in cols_to_show if c in subset.columns]
