@@ -144,7 +144,7 @@ if df is not None and col_line_name:
                 col_pre_name, 
                 col_pwht_name, 
                 col_mat_name, 
-                col_draw_name
+                col_draw_name,
                 col_sys_name
                 
             ]
