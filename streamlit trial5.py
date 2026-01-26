@@ -12,9 +12,10 @@ PERMANENT_MASTER = "master.xlsx"
 
 # Default ονόματα στηλών
 DEFAULT_LINE_COL = "LINE No"
-DEFAULT_DRAWING_COL = "DRAWING No"  # <--- ΝΕΟ DEFAULT
+DEFAULT_DRAWING_COL = "DRAWING No"
 DEFAULT_WELD_COL = "Weld No"
 DEFAULT_AP_COL = "AP Doc Code"
+DEFAULT_WELDER_COL = "Welder"  ### <--- 1. ΝΕΑ DEFAULT ΣΤΑΘΕΡΑ ###
 DEFAULT_WPS_COL = "WPS"
 DEFAULT_PREHEAT_COL = "Preheat"
 DEFAULT_PWHT_COL = "PWHT"
@@ -50,10 +51,10 @@ df = load_data()
 with st.sidebar:
     st.title("🎛️ Μενού")
     
-    # 1. Επιλογή Σελίδας (Προστέθηκε η 3η επιλογή)
+    # 1. Επιλογή Σελίδας
     page = st.radio("Μετάβαση σε:", 
                     ["📄 Λίστα Γραμμής (Line List)", 
-                     "📐 Λίστα Σχεδίου (Drawing List)",  # <--- ΝΕΑ ΣΕΛΙΔΑ
+                     "📐 Λίστα Σχεδίου (Drawing List)", 
                      "🔍 Αναζήτηση Κόλλησης (Λεπτομέρειες)"])
     
     st.divider()
@@ -72,22 +73,26 @@ with st.sidebar:
         # --- Dropdowns για αντιστοίχιση ---
         st.caption("Βασικά Πεδία")
         idx_line = get_index(all_cols, settings.get("col_line_name"), DEFAULT_LINE_COL)
-        idx_draw = get_index(all_cols, settings.get("col_draw_name"), DEFAULT_DRAWING_COL) # <--- ΝΕΟ INDEX
+        idx_draw = get_index(all_cols, settings.get("col_draw_name"), DEFAULT_DRAWING_COL)
         idx_weld = get_index(all_cols, settings.get("col_weld_name"), DEFAULT_WELD_COL)
         idx_ap   = get_index(all_cols, settings.get("col_ap_name"), DEFAULT_AP_COL)
 
         col_line_name = st.selectbox("Στήλη LINE No:", all_cols, index=idx_line)
-        col_draw_name = st.selectbox("Στήλη DRAWING No:", all_cols, index=idx_draw) # <--- ΝΕΟ DROPDOWN
+        col_draw_name = st.selectbox("Στήλη DRAWING No:", all_cols, index=idx_draw)
         col_weld_name = st.selectbox("Στήλη WELD No:", all_cols, index=idx_weld)
         col_ap_name   = st.selectbox("Στήλη AP Doc Code:", all_cols, index=idx_ap)
 
         st.caption("Πεδία Πίνακα (List View)")
+        
+        # Υπολογισμός Index
+        idx_welder = get_index(all_cols, settings.get("col_welder_name"), DEFAULT_WELDER_COL) ### <--- 2a. ΕΥΡΕΣΗ INDEX WELDER ###
         idx_wps  = get_index(all_cols, settings.get("col_wps_name"), DEFAULT_WPS_COL)
         idx_pre  = get_index(all_cols, settings.get("col_pre_name"), DEFAULT_PREHEAT_COL)
         idx_pwht = get_index(all_cols, settings.get("col_pwht_name"), DEFAULT_PWHT_COL)
         idx_mat  = get_index(all_cols, settings.get("col_mat_name"), DEFAULT_MAT_COL)
-        idx_draw = get_index(all_cols, settings.get("col_draw_name"), DEFAULT_DRAWING_COL)
-
+        
+        # Selectboxes
+        col_welder_name = st.selectbox("Στήλη Welder:", all_cols, index=idx_welder) ### <--- 2b. SELECTBOX WELDER ###
         col_wps_name  = st.selectbox("Στήλη WPS:", all_cols, index=idx_wps)
         col_pre_name  = st.selectbox("Στήλη Preheat:", all_cols, index=idx_pre)
         col_pwht_name = st.selectbox("Στήλη PWHT:", all_cols, index=idx_pwht)
@@ -126,8 +131,18 @@ if df is not None and col_line_name:
 
             st.subheader("Λίστα Κολλήσεων")
             
-            # Στήλες για Line List (Δεν βάζουμε το Line No εδώ, αφού είναι στον τίτλο)
-            cols_to_show = [col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name ,col_draw_name]
+            # Στήλες για Line List (Προσθήκη Welder ΠΡΙΝ το WPS)
+            # ### <--- 3. ΠΡΟΣΘΗΚΗ WELDER ΣΤΗ ΛΙΣΤΑ ###
+            cols_to_show = [
+                col_weld_name, 
+                col_welder_name,  # Εδώ μπήκε ο Welder
+                col_wps_name,     # Πριν το WPS
+                col_pre_name, 
+                col_pwht_name, 
+                col_mat_name, 
+                col_draw_name
+            ]
+            
             existing_cols = [c for c in cols_to_show if c in subset.columns]
             
             display_df = subset[existing_cols].copy()
@@ -141,34 +156,29 @@ if df is not None and col_line_name:
             st.dataframe(display_df, use_container_width=True, height=600)
 
     # ==========================================
-    # ΣΕΛΙΔΑ 2 (ΝΕΑ): ΛΙΣΤΑ ΣΧΕΔΙΟΥ (DRAWING LIST)
+    # ΣΕΛΙΔΑ 2: ΛΙΣΤΑ ΣΧΕΔΙΟΥ (DRAWING LIST)
     # ==========================================
     elif page == "📐 Λίστα Σχεδίου (Drawing List)":
         st.title("📐 Επισκόπηση Σχεδίου (Iso)")
         st.markdown("---")
 
-        # 1. Επιλογή Drawing
         if col_draw_name in df.columns:
             drawings = sorted(df[col_draw_name].astype(str).unique())
             sel_draw_overview = st.selectbox("🗂️ Επίλεξε Drawing No:", drawings, index=None, placeholder="Διάλεξε σχέδιο...")
 
             if sel_draw_overview:
-                # Φιλτράρισμα με βάση το σχέδιο
                 subset = df[df[col_draw_name] == sel_draw_overview]
 
                 st.info(f"📌 **Drawing:** {sel_draw_overview}  |  📊 **Σύνολο Κολλήσεων:** {len(subset)}")
 
                 st.subheader("Λίστα Κολλήσεων Σχεδίου")
 
-                # Στήλες για Drawing List (ΕΔΩ ΠΡΟΣΘΕΤΟΥΜΕ ΤΟ LINE NO)
                 cols_to_show = [col_line_name, col_weld_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name]
                 
-                # Έλεγχος αν υπάρχουν οι στήλες
                 existing_cols = [c for c in cols_to_show if c in subset.columns]
                 
                 display_df = subset[existing_cols].copy()
 
-                # Ταξινόμηση πρώτα με Line και μετά με Weld
                 sort_cols = []
                 if col_line_name in display_df.columns: sort_cols.append(col_line_name)
                 if col_weld_name in display_df.columns: sort_cols.append(col_weld_name)
@@ -192,11 +202,9 @@ if df is not None and col_line_name:
         
         c1, c2 = st.columns([1, 2])
         
-        # Επιλογή Line
         lines = sorted(df[col_line_name].astype(str).unique())
         s_line = c1.selectbox("Αναζήτηση Line No:", lines, index=None, placeholder="Επίλεξε Γραμμή...")
         
-        # Επιλογή Weld
         s_weld = None
         if s_line:
             wlist = sorted(df[df[col_line_name] == s_line][col_weld_name].astype(str).unique())
