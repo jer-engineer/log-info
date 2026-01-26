@@ -141,8 +141,7 @@ if df is not None and col_line_name:
                 col_pre_name, 
                 col_pwht_name, 
                 col_mat_name, 
-                col_draw_name,
-                col_sys_name
+                col_draw_name
                 
             ]
             
@@ -176,7 +175,7 @@ if df is not None and col_line_name:
 
                 st.subheader("Λίστα Κολλήσεων Σχεδίου")
 
-                cols_to_show = [col_line_name, col_weld_name, col_welder_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name]
+                cols_to_show = [col_line_name, col_weld_name, col_welder_name, col_wps_name, col_pre_name, col_pwht_name, col_mat_name,col_sys_name]
                 
                 existing_cols = [c for c in cols_to_show if c in subset.columns]
                 
