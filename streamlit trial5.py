@@ -20,6 +20,7 @@ DEFAULT_WPS_COL = "WPS"
 DEFAULT_PREHEAT_COL = "Preheat"
 DEFAULT_PWHT_COL = "PWHT"
 DEFAULT_MAT_COL = "Material 1"
+DEFAULT_SYS_COL = "SYSTEM"
 
 # --- ΦΟΡΤΩΣΗ ΡΥΘΜΙΣΕΩΝ ---
 def load_settings():
@@ -90,6 +91,7 @@ with st.sidebar:
         idx_pre  = get_index(all_cols, settings.get("col_pre_name"), DEFAULT_PREHEAT_COL)
         idx_pwht = get_index(all_cols, settings.get("col_pwht_name"), DEFAULT_PWHT_COL)
         idx_mat  = get_index(all_cols, settings.get("col_mat_name"), DEFAULT_MAT_COL)
+        idx_mat  = get_index(all_cols, settings.get("col_sys_name"), DEFAULT_MAT_COL)
         
         # Selectboxes
         col_welder_name = st.selectbox("Στήλη Welder:", all_cols, index=idx_welder) ### <--- 2b. SELECTBOX WELDER ###
@@ -97,6 +99,8 @@ with st.sidebar:
         col_pre_name  = st.selectbox("Στήλη Preheat:", all_cols, index=idx_pre)
         col_pwht_name = st.selectbox("Στήλη PWHT:", all_cols, index=idx_pwht)
         col_mat_name  = st.selectbox("Στήλη Material:", all_cols, index=idx_mat)
+        col_sys_name  = st.selectbox("Στήλη SYSTEM:", all_cols, index=idx_sys)
+
 
     else:
         st.warning("Φόρτωσε το master.xlsx")
@@ -141,6 +145,8 @@ if df is not None and col_line_name:
                 col_pwht_name, 
                 col_mat_name, 
                 col_draw_name
+                col_sys_name
+                
             ]
             
             existing_cols = [c for c in cols_to_show if c in subset.columns]
